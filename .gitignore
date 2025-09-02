@@ -1,0 +1,15 @@
+# Project specific
+.cache
+*.pickle
+.envrc
+
+# Vim:
+*~
+*.sw[op]
+
+# Python:
+__pycache__/
+*.py[codz]
+*$py.class
+
+
