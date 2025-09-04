@@ -53,9 +53,9 @@ subparsers.add_parser('show-playlists', help='Show raw data for all user playlis
 subparsers.add_parser(
     'collect',
     help=(
-        'Collect or update local tracks and playlists data. If data is once collected, then all other commands '
-        'will use locally collected data: to use newer data in such a case: either delete collected pickle file, '
-        'or run `collect` command again.'
+        'Collect or update local tracks and playlists data. WARNING! If data is once collected, then all other '
+        'commands will use locally collected data, which means script will not see playlists created by itself. '
+        'To use newer data: either delete collected pickle file, or run `collect` command again.'
     ),
 )
 
@@ -370,7 +370,7 @@ class SpotifyManager(object):
             raise SpotifyCommandError('Single playlist expected, but multiple were found.')
         return playlists[0] if playlists else None
 
-    def get_validate_target_playlist(self, args):
+    def get_validate_target_playlist(self, args, description=''):
         created = False
         target_playlist = self.get_single_playlist(args.target_playlist)
         if target_playlist and not (args.allow_replace or args.allow_append):
@@ -399,7 +399,7 @@ class SpotifyManager(object):
             target_is_empty=None):
         tracks_data = self.data['tracks']
         if not target_playlist:
-            target_playlist, target_is_empty = self.get_validate_target_playlist(args)
+            target_playlist, target_is_empty = self.get_validate_target_playlist(args, description=description)
         self.print(
             f"Going to add {len(track_ids)} tracks to  playlist {args.target_playlist!r}",
         )
@@ -482,10 +482,11 @@ class SpotifyManager(object):
         playlists_data = []
         ambigous_playlists = {}
         missing_playlists = []
+        description = f"Generated with {parser.prog} by intersecting playlists: {names_text}"
 
         self.get_playlists()
         # Prepare or check playlist where intersection is saved:
-        intersection_playlist, target_is_empty = self.get_validate_target_playlist(args)
+        intersection_playlist, target_is_empty = self.get_validate_target_playlist(args, description=description)
 
         # Validate playlists that must be intersected:
         for name_or_id in names_or_ids:
@@ -532,9 +533,7 @@ class SpotifyManager(object):
             self.populate_target_playlist(
                 args,
                 intersection_track_ids,
-                description=(
-                    f"Generated with {parser.prog} by intersecting playlists: {names_text}"
-                ),
+                description=description,
                 target_playlist=intersection_playlist,
                 target_is_empty=target_is_empty,
             )
@@ -557,7 +556,8 @@ class SpotifyManager(object):
         if args.ignored_name_regex:
             ignored_name_regex = re.compile(args.ignored_name_regex)
 
-        target_playlist, target_is_empty = self.get_validate_target_playlist(args)
+        description = f"Generated with {parser.prog} by counting playlists number for each saved track"
+        target_playlist, target_is_empty = self.get_validate_target_playlist(args, description=description)
         # Prepare data for all tracks and playlists:
         if self.collection['_date_collected'] is None:
             self.print('Will run `collect` command before running counter')
@@ -606,9 +606,7 @@ class SpotifyManager(object):
             self.populate_target_playlist(
                 args,
                 list(matched_tracks.keys()),
-                description=(
-                    f"Generated with {parser.prog} by counting playlists number for each saved track"
-                ),
+                description=description,
                 target_playlist=target_playlist,
                 target_is_empty=target_is_empty,
             )
@@ -623,7 +621,8 @@ class SpotifyManager(object):
             return
 
         matched_track_ids = set()
-        target_playlist, target_is_empty = self.get_validate_target_playlist(args)
+        description = f"Generated with {parser.prog} by counting playlists number for each track"
+        target_playlist, target_is_empty = self.get_validate_target_playlist(args, description=description)
 
         all_playlists = self.get_playlists()
         checked_playlists = []
@@ -668,10 +667,8 @@ class SpotifyManager(object):
         if matched_track_ids:
             self.populate_target_playlist(
                 args,
-                matched_track_ids,
-                description=(
-                    f"Generated with {parser.prog} by counting playlists number for each saved track"
-                ),
+                list(matched_track_ids),
+                description=description,
                 target_playlist=target_playlist,
                 target_is_empty=target_is_empty,
             )
