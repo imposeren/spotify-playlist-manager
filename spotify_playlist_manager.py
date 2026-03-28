@@ -382,17 +382,28 @@ class SpotifyManager(object):
         elif not target_playlist:
             created = True
             if not args.dry_run:
-                target_playlist = self.client.user_playlist_create(
-                    self.current_user['id'],
-                    args.target_playlist,
-                    description=description,
-                )
+                target_playlist = self._create_playlist(args.target_playlist, description)
                 self.print(
                     f"Creating {args.target_playlist} playlist",
                 )
             else:
                 self.print('Skipped creating playlist because of dry run.')
         return target_playlist, created
+
+    def _create_playlist(self, name, description=''):
+        playlist = self.client.user_playlist_create(
+            self.current_user['id'],
+            name,
+            description=description,
+        )
+        self.data['playlists_by_id'][playlist['id']] = playlist
+        self.data['playlists_by_name'].setdefault(playlist['name'], []).append(playlist)
+        key = ('current_user_playlists', None)
+        self.collection.setdefault(key, []).append([playlist])
+        if self.collection.get('_date_collected'):
+            with open(self._collection_file_path, 'wb') as f:
+                pickle.dump(self.collection, f, pickle.HIGHEST_PROTOCOL)
+        return playlist
 
     def populate_target_playlist(
             self, args, track_ids, description=f"Generated with {parser.prog}", target_playlist=None,
@@ -423,12 +434,8 @@ class SpotifyManager(object):
             else:
                 raise RuntimeError('This code should not be reachable')
         else:
-            if not args.dry_run:
-                target_playlist = self.client.user_playlist_create(
-                    self.current_user['id'],
-                    args.target_playlist,
-                    description=description,
-                )
+            if not args.dry_run and not target_playlist:
+                target_playlist = self._create_playlist(args.target_playlist, description)
                 self.print(
                     f"Raw playlist data: {target_playlist}",
                     3,
@@ -482,6 +489,7 @@ class SpotifyManager(object):
         playlists_data = []
         ambigous_playlists = {}
         missing_playlists = []
+        names_text = ', '.join(names_or_ids)
         description = f"Generated with {parser.prog} by intersecting playlists: {names_text}"
 
         self.get_playlists()
